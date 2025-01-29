@@ -38,11 +38,7 @@ resource "azurerm_policy_definition" "allowed_images" {
           {
             "field": "kubernetes.pod.spec.containers[*].image",
             "notMatchInsensitively": "^(${join("|", [
-              "crnovaxregistryshared\\.azurecr\\.io",
-              "docker\\.io/bitnami",
-              "ghcr\\.io",
-              "registry\\.k8s\\.io",
-              "quay\\.io/jetstack"
+              needregex
             ])}).*"
           }
         ]
