@@ -34,24 +34,51 @@ resource "azurerm_policy_definition" "allowed_images" {
   policy_rule = <<POLICY_RULE
     {
       "if": {
-        "allOf": [
-          {
-            "field": "kubernetes.pod.spec.containers[*].image",
-            "notMatchInsensitively": "^(${join("|", [
-              needregex
-            ])}).*"
+        "not": {
+          "value": "[parameters('allowedRegistries')]",
+          "contains": {
+            "value": "[field('kubernetes.pod.spec.containers[*].image')]",
+            "match": true
           }
-        ]
+        }
       },
       "then": {
         "effect": "Deny"
       }
     }
   POLICY_RULE
+
+  parameters = <<PARAMETERS
+    {
+      "allowedRegistries": {
+        "type": "Array",
+        "metadata": {
+          "displayName": "Allowed Image Registries",
+          "description": "List of container registries that are allowed."
+        },
+        "defaultValue": [
+          "crnovaxregistryshared.azurecr.io",
+          "docker.io/bitnami",
+          "ghcr.io",
+          "registry.k8s.io",
+          "quay.io/jetstack"
+        ]
+      }
+    }
+  PARAMETERS
 }
 
 resource "azurerm_policy_assignment" "allowed_images_assignment" {
   name                 = "allowed-images-assignment"
   policy_definition_id = azurerm_policy_definition.allowed_images.id
   scope                = azurerm_kubernetes_cluster.aks.id
+  parameters = jsonencode({
+    "allowedRegistries" = [
+      "crnovaxregistryshared.azurecr.io",
+      "docker.io/bitnami",
+      "ghcr.io",
+      "registry.k8s.io",
+      "quay.io/jetstack"
+    ]
+  })
 }
