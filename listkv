@@ -1,0 +1,31 @@
+# Connect to Azure
+Connect-AzAccount
+
+# Get all Key Vaults in the subscription
+$KeyVaults = Get-AzKeyVault
+
+# Iterate through each Key Vault
+foreach ($vault in $KeyVaults) {
+    $vaultName = $vault.VaultName
+    Write-Host "Checking Key Vault: $vaultName"
+
+    # Get all secrets in the Key Vault
+    $secrets = Get-AzKeyVaultSecret -VaultName $vaultName
+
+    if ($secrets.Count -eq 0) {
+        Write-Host "No secrets found in Key Vault: $vaultName"
+        continue
+    }
+
+    foreach ($secret in $secrets) {
+        $secretName = $secret.Name
+        $secretDetails = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+
+        # Get expiration date (if exists)
+        $expirationDate = if ($null -ne $secretDetails.Expires) { $secretDetails.Expires } else { "No Expiration Set" }
+
+        Write-Host "Secret: $secretName | Expiration Date: $expirationDate | Vault: $vaultName"
+    }
+}
+
+Write-Host "Script execution completed."
