@@ -1,4 +1,19 @@
+# Ensure Az module is updated
+Write-Host "Checking and updating Az module..."
+Update-Module -Name Az -Force -ErrorAction SilentlyContinue
+
+# Import Az.KeyVault module
+Write-Host "Importing Az.KeyVault module..."
+Import-Module -Name Az.KeyVault -Force -ErrorAction SilentlyContinue
+
+# Verify if Set-AzKeyVaultNetworkRuleSet cmdlet exists
+if (-not (Get-Command Set-AzKeyVaultNetworkRuleSet -ErrorAction SilentlyContinue)) {
+    Write-Host "Error: Set-AzKeyVaultNetworkRuleSet cmdlet not found. Ensure Az.KeyVault module is installed and updated."
+    exit 1
+}
+
 # Connect to Azure
+Write-Host "Connecting to Azure..."
 Connect-AzAccount
 
 # Get the public IP of the current Azure DevOps agent
@@ -22,6 +37,7 @@ foreach ($vault in $KeyVaults) {
     } else {
         # Add the current IP to the firewall rules
         $updatedIps = $existingIps + $agentIp
+        Write-Host "Updating firewall rules for $vaultName..."
         Set-AzKeyVaultNetworkRuleSet -VaultName $vaultName -Bypass AzureServices -DefaultAction Deny -IpAddressRange $updatedIps
         Write-Host "Whitelisted IP $agentIp in Key Vault: $vaultName"
     }
