@@ -1,0 +1,48 @@
+# Connect to Azure
+Connect-AzAccount
+
+# Get the public IP of the current Azure DevOps agent
+$agentIp = (Invoke-RestMethod -Uri "https://api.ipify.org?format=json").ip
+Write-Host "Current Azure DevOps Agent IP: $agentIp"
+
+# Get all Key Vaults in the subscription
+$KeyVaults = Get-AzKeyVault
+
+# Iterate through each Key Vault
+foreach ($vault in $KeyVaults) {
+    $vaultName = $vault.VaultName
+    Write-Host "Checking Key Vault: $vaultName"
+
+    # Get existing firewall rules
+    $existingIps = $vault.NetworkAcls.IpRules | ForEach-Object { $_.Value }
+
+    # Check if the agent IP is already whitelisted
+    if ($existingIps -contains $agentIp) {
+        Write-Host "IP $agentIp is already whitelisted in $vaultName."
+    } else {
+        # Add the current IP to the firewall rules
+        $updatedIps = $existingIps + $agentIp
+        Set-AzKeyVaultNetworkRuleSet -VaultName $vaultName -Bypass AzureServices -DefaultAction Deny -IpAddressRange $updatedIps
+        Write-Host "Whitelisted IP $agentIp in Key Vault: $vaultName"
+    }
+
+    # Get all secrets in the Key Vault
+    $secrets = Get-AzKeyVaultSecret -VaultName $vaultName
+
+    if ($secrets.Count -eq 0) {
+        Write-Host "No secrets found in Key Vault: $vaultName"
+        continue
+    }
+
+    foreach ($secret in $secrets) {
+        $secretName = $secret.Name
+        $secretDetails = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+
+        # Get expiration date (if exists)
+        $expirationDate = if ($null -ne $secretDetails.Expires) { $secretDetails.Expires } else { "No Expiration Set" }
+
+        Write-Host "Secret: $secretName | Expiration Date: $expirationDate | Vault: $vaultName"
+    }
+}
+
+Write-Host "Script execution completed."
