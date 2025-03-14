@@ -1,14 +1,21 @@
-# Ensure Az module is updated
+# Ensure Az module is installed and updated
 Write-Host "Checking and updating Az module..."
-Update-Module -Name Az -Force -ErrorAction SilentlyContinue
+if (-not (Get-Module -Name Az -ListAvailable)) {
+    Install-Module -Name Az -Force -AllowClobber -Scope CurrentUser
+}
+Import-Module -Name Az -Force
 
-# Import Az.KeyVault module
-Write-Host "Importing Az.KeyVault module..."
-Import-Module -Name Az.KeyVault -Force -ErrorAction SilentlyContinue
+# Ensure Az.KeyVault module is installed
+Write-Host "Checking and installing Az.KeyVault module..."
+if (-not (Get-Module -Name Az.KeyVault -ListAvailable)) {
+    Install-Module -Name Az.KeyVault -Force -AllowClobber -Scope CurrentUser
+}
+Import-Module -Name Az.KeyVault -Force
 
 # Verify if Set-AzKeyVaultNetworkRuleSet cmdlet exists
 if (-not (Get-Command Set-AzKeyVaultNetworkRuleSet -ErrorAction SilentlyContinue)) {
     Write-Host "Error: Set-AzKeyVaultNetworkRuleSet cmdlet not found. Ensure Az.KeyVault module is installed and updated."
+    # Exit with a non-zero exit code to fail the job
     exit 1
 }
 
