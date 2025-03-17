@@ -5,6 +5,13 @@ $KeyVaults = Get-AzKeyVault
 $ExpirationDate = (Get-Date).AddMonths(12)
 $Today = Get-Date -Format yyyy-MM-dd
 
+# Define additional tags
+$Tag1Key = "maneesha"
+$Tag1Value = "script"
+
+$Tag2Key = "ExpirationSetDate"
+$Tag2Value = $Today
+
 # Iterate through each Key Vault
 foreach ($vault in $KeyVaults) {
     $vaultName = $vault.VaultName
@@ -32,19 +39,20 @@ foreach ($vault in $KeyVaults) {
                     [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secretDetails.SecretValue)
                 )
 
-                # Retrieve existing tags (if any) and add/update the "ExpirationSetDate" tag
+                # Retrieve existing tags (if any) and add/update both tags
                 $Tags = $secretDetails.Tags
                 if (-not $Tags) {
                     $Tags = @{}
                 }
-                $Tags["ExpirationSetDate"] = $Today
+                $Tags[$Tag1Key] = $Tag1Value
+                $Tags[$Tag2Key] = $Tag2Value
 
-                # Update the secret with an expiration date and new tag
+                # Update the secret with an expiration date and new tags
                 Set-AzKeyVaultSecret -VaultName $vaultName -Name $secretName `
                     -SecretValue (ConvertTo-SecureString -String $SecretValueText -AsPlainText -Force) `
                     -Expires $ExpirationDate -Tag $Tags
 
-                Write-Host "Secret '$secretName' updated with expiration and tag."
+                Write-Host "Secret '$secretName' updated with expiration and tags."
             }
             catch {
                 Write-Host "Error updating secret '$secretName' in Key Vault: $vaultName - $_" -ForegroundColor Red
