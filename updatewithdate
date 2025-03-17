@@ -3,7 +3,13 @@ $KeyVaults = Get-AzKeyVault
 
 # Define expiration period (12 months from today)
 $ExpirationDate = (Get-Date).AddMonths(12)
-$Today = Get-Date -Format yyyy-MM-dd
+
+# Define new tags
+$Tag1Key = "maneesha"
+$Tag1Value = "script"
+
+$Tag2Key = "ana"
+$Tag2Value = "maneesha=updatebyscript"
 
 # Iterate through each Key Vault
 foreach ($vault in $KeyVaults) {
@@ -22,37 +28,41 @@ foreach ($vault in $KeyVaults) {
         $secretName = $secret.Name
         $secretDetails = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
 
-        # Only update if the secret does NOT have an expiration date
-        if ($null -eq $secretDetails.Expires) {
-            Write-Host "Updating expiration for secret: $secretName in Key Vault: $vaultName"
+        # Check if the secret has the "ExpirationSetDate" tag
+        if ($secretDetails.Tags -and $secretDetails.Tags.ContainsKey("ExpirationSetDate")) {
+            # Check if the tags already exist to avoid unnecessary updates
+            $Tags = $secretDetails.Tags
+            $NeedsUpdate = $false
 
-            try {
-                # Retrieve the existing secret value securely
-                $SecretValueText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                    [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secretDetails.SecretValue)
-                )
-
-                # Retrieve existing tags (if any) and add/update the "ExpirationSetDate" and "UpdatedBy" tags
-                $Tags = $secretDetails.Tags
-                if (-not $Tags) {
-                    $Tags = @{}
-                }
-                $Tags["ExpirationSetDate"] = $Today
-                $Tags["UpdatedBy"] = "script"
-
-                # Update the secret with an expiration date and new tags
-                Set-AzKeyVaultSecret -VaultName $vaultName -Name $secretName `
-                    -SecretValue (ConvertTo-SecureString -String $SecretValueText -AsPlainText -Force) `
-                    -Expires $ExpirationDate -Tag $Tags
-
-                Write-Host "Secret '$secretName' updated with expiration and tags."
+            if (-not $Tags.ContainsKey($Tag1Key) -or $Tags[$Tag1Key] -ne $Tag1Value) {
+                $Tags[$Tag1Key] = $Tag1Value
+                $NeedsUpdate = $true
             }
-            catch {
-                Write-Host "Error updating secret '$secretName' in Key Vault: $vaultName - $_" -ForegroundColor Red
+
+            if (-not $Tags.ContainsKey($Tag2Key) -or $Tags[$Tag2Key] -ne $Tag2Value) {
+                $Tags[$Tag2Key] = $Tag2Value
+                $NeedsUpdate = $true
+            }
+
+            if ($NeedsUpdate) {
+                Write-Host "Updating tags '$Tag1Key=$Tag1Value' and '$Tag2Key=$Tag2Value' for secret: $secretName in Key Vault: $vaultName"
+
+                try {
+                    # Update secret attributes (expiration date) **without creating a new version**
+                    Set-AzKeyVaultSecretAttribute -VaultName $vaultName -Name $secretName -Expires $ExpirationDate -Tags $Tags
+
+                    Write-Host "Secret '$secretName' updated with expiration date and new tags."
+                }
+                catch {
+                    Write-Host "Error updating secret attributes for '$secretName' in Key Vault: $vaultName - $_" -ForegroundColor Red
+                }
+            }
+            else {
+                Write-Host "Tags already exist for secret: $secretName. Skipping update."
             }
         }
         else {
-            Write-Host "Secret '$secretName' already has an expiration date. Skipping update."
+            Write-Host "Secret '$secretName' does not have 'ExpirationSetDate' tag. Skipping."
         }
     }
 }
