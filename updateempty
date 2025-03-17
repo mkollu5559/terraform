@@ -1,0 +1,54 @@
+# Get all Key Vaults in the subscription
+$KeyVaults = Get-AzKeyVault
+
+# Define the correct tag value
+$TagKey = "maneesha"
+$TagValue = "script"
+
+# Iterate through each Key Vault
+foreach ($vault in $KeyVaults) {
+    $vaultName = $vault.VaultName
+    Write-Host "Checking Key Vault: $vaultName"
+
+    # Get all secrets in the Key Vault
+    $Secrets = Get-AzKeyVaultSecret -VaultName $vaultName
+
+    if ($Secrets.Count -eq 0) {
+        Write-Host "No secrets found in Key Vault: $vaultName"
+        continue
+    }
+
+    foreach ($secret in $Secrets) {
+        $secretName = $secret.Name
+        $secretDetails = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+
+        # Retrieve existing tags (if any)
+        $Tags = $secretDetails.Tags
+        if (-not $Tags) {
+            continue  # Skip if no tags exist
+        }
+
+        # Check if the "maneesha" tag exists but has an empty or null value
+        if ($Tags.ContainsKey($TagKey) -and ([string]::IsNullOrWhiteSpace($Tags[$TagKey]))) {
+            Write-Host "Updating empty tag '$TagKey' to '$TagValue' for secret: $secretName in Key Vault: $vaultName"
+            
+            # Update the tag value
+            $Tags[$TagKey] = $TagValue
+
+            try {
+                # Update the secret with the corrected tag value **without creating a new version**
+                Set-AzKeyVaultSecretAttribute -VaultName $vaultName -Name $secretName -Tags $Tags
+
+                Write-Host "Secret '$secretName' updated: '$TagKey' is now '$TagValue'."
+            }
+            catch {
+                Write-Host "Error updating secret '$secretName' in Key Vault: $vaultName - $_" -ForegroundColor Red
+            }
+        }
+        else {
+            Write-Host "Secret '$secretName' has a valid '$TagKey' tag. Skipping update."
+        }
+    }
+}
+
+Write-Host "Script execution completed."
