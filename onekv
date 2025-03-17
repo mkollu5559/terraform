@@ -1,0 +1,55 @@
+# Hardcoded Key Vault name for testing
+$vaultName = "test"
+
+# Define expiration period (12 months from today)
+$ExpirationDate = (Get-Date).AddMonths(12)
+$Today = Get-Date -Format yyyy-MM-dd
+
+Write-Host "Checking Key Vault: $vaultName"
+
+# Get all secrets in the Key Vault
+$Secrets = Get-AzKeyVaultSecret -VaultName $vaultName
+
+if ($Secrets.Count -eq 0) {
+    Write-Host "No secrets found in Key Vault: $vaultName"
+    exit
+}
+
+foreach ($secret in $Secrets) {
+    $secretName = $secret.Name
+    $secretDetails = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+
+    # Only update if the secret does NOT have an expiration date
+    if ($null -eq $secretDetails.Expires) {
+        Write-Host "Updating expiration for secret: $secretName in Key Vault: $vaultName"
+
+        try {
+            # Retrieve the existing secret value securely
+            $SecretValueText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secretDetails.SecretValue)
+            )
+
+            # Retrieve existing tags (if any) and add/update the "ExpirationSetDate" tag
+            $Tags = $secretDetails.Tags
+            if (-not $Tags) {
+                $Tags = @{}
+            }
+            $Tags["ExpirationSetDate"] = $Today
+
+            # Update the secret with an expiration date and new tag
+            Set-AzKeyVaultSecret -VaultName $vaultName -Name $secretName `
+                -SecretValue (ConvertTo-SecureString -String $SecretValueText -AsPlainText -Force) `
+                -Expires $ExpirationDate -Tag $Tags
+
+            Write-Host "Secret '$secretName' updated with expiration and tag."
+        }
+        catch {
+            Write-Host "Error updating secret '$secretName' in Key Vault: $vaultName - $_" -ForegroundColor Red
+        }
+    }
+    else {
+        Write-Host "Secret '$secretName' already has an expiration date. Skipping update."
+    }
+}
+
+Write-Host "Script execution completed."
