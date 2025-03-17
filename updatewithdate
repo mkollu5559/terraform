@@ -7,7 +7,7 @@ $Today = Get-Date -Format yyyy-MM-dd
 
 # Define required tags
 $Tag1Key = "maneesha"
-$Tag1Value = "script"
+$Tag1Value = "script"  # <<-- Ensures value is "script"
 
 $Tag2Key = "ExpirationSetDate"
 $Tag2Value = $Today
@@ -43,16 +43,16 @@ foreach ($vault in $KeyVaults) {
             Write-Host "Setting expiration date and adding tags for secret: $secretName in Key Vault: $vaultName"
             
             # Ensure both tags are added
-            $Tags[$Tag1Key] = $Tag1Value
+            $Tags[$Tag1Key] = $Tag1Value  # <<-- Ensures "maneesha" = "script"
             $Tags[$Tag2Key] = $Tag2Value
             $NeedsUpdate = $true
         }
 
-        ### **Step 2: If the secret has "ExpirationSetDate=<current date>", ensure it also has "maneesha=script" tag** ###
+        ### **Step 2: If the secret has "ExpirationSetDate=<current date>", ensure it also has "maneesha=script"** ###
         elseif ($Tags.ContainsKey($Tag2Key) -and $Tags[$Tag2Key] -eq $Tag2Value) {
             if (-not $Tags.ContainsKey($Tag1Key) -or $Tags[$Tag1Key] -ne $Tag1Value) {
                 Write-Host "Adding missing tag '$Tag1Key=$Tag1Value' to secret: $secretName in Key Vault: $vaultName"
-                $Tags[$Tag1Key] = $Tag1Value
+                $Tags[$Tag1Key] = $Tag1Value  # <<-- Ensures "maneesha" = "script"
                 $NeedsUpdate = $true
             }
         }
