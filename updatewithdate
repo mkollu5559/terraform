@@ -4,12 +4,9 @@ $KeyVaults = Get-AzKeyVault
 # Define expiration period (12 months from today)
 $ExpirationDate = (Get-Date).AddMonths(12)
 
-# Define new tags
-$Tag1Key = "maneesha"
-$Tag1Value = "script"
-
-$Tag2Key = "ana"
-$Tag2Value = "maneesha=updatebyscript"
+# Define the single tag
+$TagKey = "maneesha"
+$TagValue = "script"
 
 # Iterate through each Key Vault
 foreach ($vault in $KeyVaults) {
@@ -30,35 +27,30 @@ foreach ($vault in $KeyVaults) {
 
         # Check if the secret has the "ExpirationSetDate" tag
         if ($secretDetails.Tags -and $secretDetails.Tags.ContainsKey("ExpirationSetDate")) {
-            # Check if the tags already exist to avoid unnecessary updates
+            # Check if the tag already exists to avoid unnecessary updates
             $Tags = $secretDetails.Tags
             $NeedsUpdate = $false
 
-            if (-not $Tags.ContainsKey($Tag1Key) -or $Tags[$Tag1Key] -ne $Tag1Value) {
-                $Tags[$Tag1Key] = $Tag1Value
-                $NeedsUpdate = $true
-            }
-
-            if (-not $Tags.ContainsKey($Tag2Key) -or $Tags[$Tag2Key] -ne $Tag2Value) {
-                $Tags[$Tag2Key] = $Tag2Value
+            if (-not $Tags.ContainsKey($TagKey) -or $Tags[$TagKey] -ne $TagValue) {
+                $Tags[$TagKey] = $TagValue
                 $NeedsUpdate = $true
             }
 
             if ($NeedsUpdate) {
-                Write-Host "Updating tags '$Tag1Key=$Tag1Value' and '$Tag2Key=$Tag2Value' for secret: $secretName in Key Vault: $vaultName"
+                Write-Host "Updating tag '$TagKey=$TagValue' for secret: $secretName in Key Vault: $vaultName"
 
                 try {
                     # Update secret attributes (expiration date) **without creating a new version**
                     Set-AzKeyVaultSecretAttribute -VaultName $vaultName -Name $secretName -Expires $ExpirationDate -Tags $Tags
 
-                    Write-Host "Secret '$secretName' updated with expiration date and new tags."
+                    Write-Host "Secret '$secretName' updated with expiration date and tag '$TagKey=$TagValue'."
                 }
                 catch {
                     Write-Host "Error updating secret attributes for '$secretName' in Key Vault: $vaultName - $_" -ForegroundColor Red
                 }
             }
             else {
-                Write-Host "Tags already exist for secret: $secretName. Skipping update."
+                Write-Host "Tag '$TagKey' already exists for secret: $secretName. Skipping update."
             }
         }
         else {
