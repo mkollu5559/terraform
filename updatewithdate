@@ -1,0 +1,56 @@
+# Get all Key Vaults in the subscription
+$KeyVaults = Get-AzKeyVault
+
+# Define the new tag
+$NewTagKey = "maneesha"
+$NewTagValue = "script"
+
+# Iterate through each Key Vault
+foreach ($vault in $KeyVaults) {
+    $vaultName = $vault.VaultName
+    Write-Host "Checking Key Vault: $vaultName"
+
+    # Get all secrets in the Key Vault
+    $Secrets = Get-AzKeyVaultSecret -VaultName $vaultName
+
+    if ($Secrets.Count -eq 0) {
+        Write-Host "No secrets found in Key Vault: $vaultName"
+        continue
+    }
+
+    foreach ($secret in $Secrets) {
+        $secretName = $secret.Name
+        $secretDetails = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+
+        # Check if the secret has the "ExpirationSetDate" tag
+        if ($secretDetails.Tags -and $secretDetails.Tags.ContainsKey("ExpirationSetDate")) {
+            Write-Host "Adding new tag '$NewTagKey=$NewTagValue' to secret: $secretName in Key Vault: $vaultName"
+
+            try {
+                # Retrieve the existing secret value securely
+                $SecretValueText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                    [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secretDetails.SecretValue)
+                )
+
+                # Retrieve existing tags and add the new tag
+                $Tags = $secretDetails.Tags
+                $Tags[$NewTagKey] = $NewTagValue  # Add or update the new tag
+
+                # Update the secret with the new tag
+                Set-AzKeyVaultSecret -VaultName $vaultName -Name $secretName `
+                    -SecretValue (ConvertTo-SecureString -String $SecretValueText -AsPlainText -Force) `
+                    -Tag $Tags
+
+                Write-Host "Secret '$secretName' updated with new tag '$NewTagKey=$NewTagValue'."
+            }
+            catch {
+                Write-Host "Error updating secret '$secretName' in Key Vault: $vaultName - $_" -ForegroundColor Red
+            }
+        }
+        else {
+            Write-Host "Secret '$secretName' does not have 'ExpirationSetDate' tag. Skipping."
+        }
+    }
+}
+
+Write-Host "Script execution completed."
