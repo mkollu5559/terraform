@@ -25,24 +25,33 @@ foreach ($vault in $allKeyVaults) {
             -Name $secretName `
             -IncludeVersions
 
-        # 2) Filter to versions that DO NOT have the 'ExpirationDate' tag
-        $noExpirationVersions = $versions | Where-Object {
-            -not $_.Tags.ContainsKey("ExpirationDate")
+        # If we have no versions, skip to the next secret
+        if (-not $versions) {
+            Write-Host "    No versions returned for secret '$secretName'."
+            Write-Host ""
+            continue
+        }
+
+        # 2) Filter out any version that HAS an ExpirationDate tag
+        #    Keep versions that do not have that tag – even if they have no tags at all
+        $filteredVersions = $versions | Where-Object {
+            # If $_.Tags is $null, or doesn't contain ExpirationDate, keep it
+            -not (($_.Tags) -and ($_.Tags.ContainsKey("ExpirationDate")))
         }
 
         # 3) Sort by creation time DESCENDING (newest first) and select the first one
-        $newestNoExpiration = $noExpirationVersions |
+        $newestVersion = $filteredVersions |
             Sort-Object Created -Descending |
             Select-Object -First 1
 
         # 4) Print results
-        if ($newestNoExpiration) {
-            Write-Host "    Newest version WITHOUT 'ExpirationDate':"
-            Write-Host "      VersionId: $($newestNoExpiration.Id)"
-            Write-Host "      Created:   $($newestNoExpiration.Created)"
+        if ($newestVersion) {
+            Write-Host "    Newest version WITHOUT 'ExpirationDate' tag (including no-tag versions):"
+            Write-Host "      VersionId: $($newestVersion.Id)"
+            Write-Host "      Created:   $($newestVersion.Created)"
         }
         else {
-            Write-Host "    No versions without 'ExpirationDate' tag found."
+            Write-Host "    No matching versions found (all had an 'ExpirationDate' tag)."
         }
 
         Write-Host ""
