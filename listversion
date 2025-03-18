@@ -1,24 +1,50 @@
-# 1) Get ALL versions of this secret. (-IncludeVersions switch)
-$versions = Get-AzKeyVaultSecret `
-    -VaultName $vaultName `
-    -Name $secretName `
-    -IncludeVersions
+# Make sure you're authenticated:
+#   Connect-AzAccount
+# If you have multiple subscriptions, set the context if needed:
+#   Set-AzContext -Subscription "YOUR_SUBSCRIPTION_ID_OR_NAME"
 
-# 2) Filter to versions that DO NOT have the 'ExpirationDate' tag
-$noExpirationVersions = $versions | Where-Object {
-    -not $_.Tags.ContainsKey("ExpirationDate")
-}
+# Get all Key Vaults in the currently selected subscription
+$allKeyVaults = Get-AzKeyVault
 
-# 3) Sort by creation time DESCENDING (newest first) and select the first one
-$newestNoExpiration = $noExpirationVersions |
-    Sort-Object Created -Descending |
-    Select-Object -First 1
+foreach ($vault in $allKeyVaults) {
+    $vaultName = $vault.VaultName
+    Write-Host "==================================================="
+    Write-Host "Vault: $vaultName"
+    Write-Host "==================================================="
 
-if ($newestNoExpiration) {
-    Write-Host "Newest version WITHOUT 'ExpirationDate' for secret '$secretName':"
-    Write-Host "  VersionId: $($newestNoExpiration.Id)"
-    Write-Host "  Created:   $($newestNoExpiration.Created)"
-}
-else {
-    Write-Host "No versions without 'ExpirationDate' tag found for secret: $secretName"
+    # Get the (latest) version of all secrets to discover their names
+    $allSecrets = Get-AzKeyVaultSecret -VaultName $vaultName
+
+    foreach ($secret in $allSecrets) {
+        $secretName = $secret.Name
+        Write-Host "  Processing Secret: $secretName"
+
+        # 1) Get ALL versions of this secret
+        $versions = Get-AzKeyVaultSecret `
+            -VaultName $vaultName `
+            -Name $secretName `
+            -IncludeVersions
+
+        # 2) Filter to versions that DO NOT have the 'ExpirationDate' tag
+        $noExpirationVersions = $versions | Where-Object {
+            -not $_.Tags.ContainsKey("ExpirationDate")
+        }
+
+        # 3) Sort by creation time DESCENDING (newest first) and select the first one
+        $newestNoExpiration = $noExpirationVersions |
+            Sort-Object Created -Descending |
+            Select-Object -First 1
+
+        # 4) Print results
+        if ($newestNoExpiration) {
+            Write-Host "    Newest version WITHOUT 'ExpirationDate':"
+            Write-Host "      VersionId: $($newestNoExpiration.Id)"
+            Write-Host "      Created:   $($newestNoExpiration.Created)"
+        }
+        else {
+            Write-Host "    No versions without 'ExpirationDate' tag found."
+        }
+
+        Write-Host ""
+    }
 }
