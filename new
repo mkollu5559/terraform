@@ -1,16 +1,74 @@
-# Get the latest version of the secret from Key Vault
-$latestSecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+$allKeyVaults = Get-AzKeyVault
 
-# Extract the current/latest version ID from the latest secret object
-$currentVersionId = ($latestSecret.Id -split "/")[-1]
+foreach ($vault in $allKeyVaults) {
+    $vaultName = $vault.VaultName
+    Write-Host "======================================="
+    Write-Host "Vault: $vaultName"
+    Write-Host "======================================="
+    
+    # Get all secrets from this vault
+    $allSecrets = Get-AzKeyVaultSecret -VaultName $vaultName
 
-# Extract the selected version ID from the newest version without "ExpirationSetDate"
-$selectedVersionId = ($newestVersion.Id -split "/")[-1]
+    foreach ($Secret in $allSecrets) {
+        $secretName = $Secret.Name
+        Write-Host "Processing Secret: $secretName"
 
-# Check if the selected version is NOT the current version
-if ($selectedVersionId -ne $currentVersionId) {
-    Write-Host "WARNING: This is NOT the current version for $vaultName -> $secretName"
-    Write-Host "    Selected Version: $selectedVersionId"
-    Write-Host "    Current Version:  $currentVersionId"
-    Write-Host ""
+        # Get all versions of this secret
+        $versions = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -IncludeVersions
+
+        # If no versions exist, skip to the next secret
+        if (-not $versions) {
+            Write-Host "No versions returned for: $secretName"
+            Write-Host ""
+            Continue
+        }
+
+        # Get the latest version of the secret from Key Vault
+        $latestSecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+        $currentVersionId = ($latestSecret.Id -split "/")[-1]  # Extract the current/latest version ID
+
+        # Filter out any version that HAS an "ExpirationSetDate" tag
+        $filteredVersions = $versions | Where-Object {
+            $_.Tags -is $null -or -not ($_.Tags.ContainsKey("ExpirationSetDate"))
+        }
+
+        # Sort by creation time DESCENDING (newest first) and select the first one
+        $newestVersion = $filteredVersions | Sort-Object Created -Descending | Select-Object -First 1
+
+        # If we have no versions left after filtering, skip to the next secret
+        if (-not $newestVersion) {
+            Write-Host "No matching versions found (all had an 'ExpirationSetDate' tag)."
+            Write-Host ""
+            Continue
+        }
+
+        # Extract the selected version ID
+        $selectedVersionId = ($newestVersion.Id -split "/")[-1]
+
+        # Check if the selected version is NOT the current version
+        if ($selectedVersionId -ne $currentVersionId) {
+            Write-Host "WARNING: This is NOT the current version for $vaultName -> $secretName"
+            Write-Host "    Selected Version: $selectedVersionId"
+            Write-Host "    Current Version:  $currentVersionId"
+            Write-Host ""
+        }
+
+        # Print results
+        Write-Host "Newest version WITHOUT 'ExpirationSetDate' tag:"
+        Write-Host "    VersionId: $selectedVersionId"
+        Write-Host "    Created: $($newestVersion.Created)"
+
+        # Retrieve the secret’s plaintext value (assuming the .Value property has it)
+        $secretValue = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -Version $selectedVersionId -AsPlainText
+
+        # Check if secret value is empty or null
+        if (-not $secretValue) {
+            Write-Host "ERROR: Secret value is empty or null."
+        }
+        elseif ($secretValue -eq "") {
+            Write-Host "ERROR: Secret value is exactly ''."
+        }
+
+        Write-Host ""
+    }
 }
