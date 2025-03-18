@@ -49,15 +49,19 @@ foreach ($vault in $allKeyVaults) {
             Write-Host "      VersionId: $($newestVersion.Id)"
             Write-Host "      Created:   $($newestVersion.Created)"
 
-            # Retrieve the secret’s plaintext value (most Az versions expose this in .Value)
+            # Retrieve the secret’s plaintext value (assuming the .Value property has it)
             $secretValue = $newestVersion.Value
 
-            # If .Value is not null/empty and doesn't start with '{', print it
-            if ($secretValue -and $secretValue -notlike '{*') {
-                Write-Host "      Secret Value (plaintext): $secretValue"
+            # Only raise an error if the value is null/empty or exactly '{'
+            if (-not $secretValue) {
+                Write-Host "      ERROR: Secret value is empty or null."
+            }
+            elseif ($secretValue -eq '{') {
+                Write-Host "      ERROR: Secret value is exactly '{'."
             }
             else {
-                Write-Host "      Secret Value not shown (either empty/null or begins with '{')."
+                # We do NOT print the secret value, just remain silent if it's neither empty nor exactly '{'
+                Write-Host "      (Secret value is present but not printed.)"
             }
         }
         else {
