@@ -1,56 +1,25 @@
-<#
-.SYNOPSIS
-  Lists all Key Vaults in a subscription, then for each vault and each secret,
-  finds the earliest (oldest) version that does NOT have an `ExpirationDate` tag.
-#>
+# 1) Get ALL versions of this secret. (-IncludeVersions switch)
+$versions = Get-AzKeyVaultSecret `
+    -VaultName $vaultName `
+    -Name $secretName `
+    -IncludeVersions
 
-# 1) Optionally specify your subscription (if you have more than one).
-#    If you omit this, the script will use your current/default subscription context.
-$subscriptionId = "00000000-0000-0000-0000-000000000000"
-Set-AzContext -Subscription $subscriptionId
+# 2) Filter to versions that DO have the 'ExpirationDate' tag
+$hasExpirationVersions = $versions | Where-Object {
+    $_.Tags.ContainsKey("ExpirationDate")
+}
 
-# 2) Get all Key Vaults in the subscription
-$vaults = Get-AzKeyVault
+# 3) Sort by creation time DESCENDING (newest first) and select the first one
+$newestExpiration = $hasExpirationVersions |
+    Sort-Object Created -Descending |
+    Select-Object -First 1
 
-foreach ($vault in $vaults) {
-    $vaultName = $vault.VaultName
-    Write-Host "======================================================================"
-    Write-Host "Processing Key Vault: $vaultName"
-    Write-Host "======================================================================"
-
-    # 3) Get the latest version of all secrets to see the secret names.
-    #    By default, Get-AzKeyVaultSecret returns only the latest version of each secret.
-    $allSecrets = Get-AzKeyVaultSecret -VaultName $vaultName
-
-    # Extract unique secret names
-    $secretNames = $allSecrets.Name | Sort-Object -Unique
-
-    foreach ($secretName in $secretNames) {
-
-        # 4) Get ALL versions of this secret. (-IncludeVersions switch)
-        $versions = Get-AzKeyVaultSecret `
-            -VaultName $vaultName `
-            -Name $secretName `
-            -IncludeVersions
-
-        # 5) Filter to versions that do NOT have the 'ExpirationDate' tag
-        $noExpirationVersions = $versions | Where-Object {
-            # Either there are no tags at all, or the tags don't contain the key 'ExpirationDate'
-            -not $_.Tags.ContainsKey("ExpirationDate")
-        }
-
-        # 6) Sort by creation time ascending and pick the earliest (oldest) version
-        $earliestNoExpiration = $noExpirationVersions | Sort-Object Created -Ascending | Select-Object -First 1
-
-        if ($earliestNoExpiration) {
-            Write-Host "Earliest no-ExpirationDate version for secret '$secretName':"
-            Write-Host "  VersionId: $($earliestNoExpiration.Id)"
-            Write-Host "  Created:   $($earliestNoExpiration.Created)"
-        }
-        else {
-            Write-Host "No versions without ExpirationDate tag found for secret: $secretName"
-        }
-    }
-
-    Write-Host ""
+if ($newestExpiration) {
+    Write-Host "Newest version with 'ExpirationDate' for secret '$secretName':"
+    Write-Host "  VersionId: $($newestExpiration.Id)"
+    Write-Host "  Created:   $($newestExpiration.Created)"
+    Write-Host "  ExpirationDate Tag: $($newestExpiration.Tags['ExpirationDate'])"
+}
+else {
+    Write-Host "No versions with 'ExpirationDate' tag found for secret: $secretName"
 }
