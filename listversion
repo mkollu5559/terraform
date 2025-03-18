@@ -20,12 +20,7 @@ foreach ($vault in $allKeyVaults) {
         Write-Host "  Processing Secret: $secretName"
 
         # 1) Get ALL versions of this secret
-        $versions = Get-AzKeyVaultSecret `
-            -VaultName $vaultName `
-            -Name $secretName `
-            -IncludeVersions
-
-        # If we have no versions, skip to the next secret
+        $versions = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -IncludeVersions
         if (-not $versions) {
             Write-Host "    No versions returned for secret '$secretName'."
             Write-Host ""
@@ -33,36 +28,25 @@ foreach ($vault in $allKeyVaults) {
         }
 
         # 2) Filter out any version that HAS an ExpirationDate tag
-        #    Keep versions that do not have that tag – even if they have no tags at all
         $filteredVersions = $versions | Where-Object {
             -not (($_.Tags) -and ($_.Tags.ContainsKey("ExpirationDate")))
         }
 
         # 3) Sort by creation time DESCENDING (newest first) and select the first one
-        $newestVersion = $filteredVersions |
-            Sort-Object Created -Descending |
-            Select-Object -First 1
+        $newestVersion = $filteredVersions | Sort-Object Created -Descending | Select-Object -First 1
 
-        # 4) Print results
         if ($newestVersion) {
-            Write-Host "    Newest version WITHOUT 'ExpirationDate' tag (including no-tag versions):"
+            Write-Host "    Newest version WITHOUT 'ExpirationDate' tag:"
             Write-Host "      VersionId: $($newestVersion.Id)"
             Write-Host "      Created:   $($newestVersion.Created)"
 
-            # Retrieve the secret’s plaintext value (assuming the .Value property has it)
+            # -------------------------------------------------------------------
+            # Always print the secret value from .Value as-is (plain text),
+            # even if it's null, empty, or contains braces.
+            # -------------------------------------------------------------------
             $secretValue = $newestVersion.Value
 
-            # If the value is null/empty or exactly '{', print an error message
-            # Otherwise, print the plaintext secret
-            if (-not $secretValue) {
-                Write-Host "      ERROR: Secret value is empty or null."
-            }
-            elseif ($secretValue -eq '{') {
-                Write-Host "      ERROR: Secret value is exactly '{'."
-            }
-            else {
-                Write-Host "      Secret Value (plaintext): $secretValue"
-            }
+            Write-Host "      Secret Value (plaintext, no checks): '$secretValue'"
         }
         else {
             Write-Host "    No matching versions found (all had an 'ExpirationDate' tag)."
