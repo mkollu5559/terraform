@@ -1,0 +1,16 @@
+# Get the latest version of the secret from Key Vault
+$latestSecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+
+# Extract the current/latest version ID from the latest secret object
+$currentVersionId = ($latestSecret.Id -split "/")[-1]
+
+# Extract the selected version ID from the newest version without "ExpirationSetDate"
+$selectedVersionId = ($newestVersion.Id -split "/")[-1]
+
+# Check if the selected version is NOT the current version
+if ($selectedVersionId -ne $currentVersionId) {
+    Write-Host "WARNING: This is NOT the current version for $vaultName -> $secretName"
+    Write-Host "    Selected Version: $selectedVersionId"
+    Write-Host "    Current Version:  $currentVersionId"
+    Write-Host ""
+}
