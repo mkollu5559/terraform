@@ -52,7 +52,8 @@ foreach ($vault in $allKeyVaults) {
             # Retrieve the secret’s plaintext value (assuming the .Value property has it)
             $secretValue = $newestVersion.Value
 
-            # Only raise an error if the value is null/empty or exactly '{'
+            # If the value is null/empty or exactly '{', print an error message
+            # Otherwise, print the plaintext secret
             if (-not $secretValue) {
                 Write-Host "      ERROR: Secret value is empty or null."
             }
@@ -60,8 +61,7 @@ foreach ($vault in $allKeyVaults) {
                 Write-Host "      ERROR: Secret value is exactly '{'."
             }
             else {
-                # We do NOT print the secret value, just remain silent if it's neither empty nor exactly '{'
-                Write-Host "      (Secret value is present but not printed.)"
+                Write-Host "      Secret Value (plaintext): $secretValue"
             }
         }
         else {
