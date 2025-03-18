@@ -1,0 +1,6 @@
+az keyvault secret show \
+  --vault-name "MyKeyVault" \
+  --name "MySecret" \
+  --version "SECRET_VERSION_GUID" \
+  --query "value" \
+  -o tsv
