@@ -4,22 +4,21 @@ $versions = Get-AzKeyVaultSecret `
     -Name $secretName `
     -IncludeVersions
 
-# 2) Filter to versions that DO have the 'ExpirationDate' tag
-$hasExpirationVersions = $versions | Where-Object {
-    $_.Tags.ContainsKey("ExpirationDate")
+# 2) Filter to versions that DO NOT have the 'ExpirationDate' tag
+$noExpirationVersions = $versions | Where-Object {
+    -not $_.Tags.ContainsKey("ExpirationDate")
 }
 
 # 3) Sort by creation time DESCENDING (newest first) and select the first one
-$newestExpiration = $hasExpirationVersions |
+$newestNoExpiration = $noExpirationVersions |
     Sort-Object Created -Descending |
     Select-Object -First 1
 
-if ($newestExpiration) {
-    Write-Host "Newest version with 'ExpirationDate' for secret '$secretName':"
-    Write-Host "  VersionId: $($newestExpiration.Id)"
-    Write-Host "  Created:   $($newestExpiration.Created)"
-    Write-Host "  ExpirationDate Tag: $($newestExpiration.Tags['ExpirationDate'])"
+if ($newestNoExpiration) {
+    Write-Host "Newest version WITHOUT 'ExpirationDate' for secret '$secretName':"
+    Write-Host "  VersionId: $($newestNoExpiration.Id)"
+    Write-Host "  Created:   $($newestNoExpiration.Created)"
 }
 else {
-    Write-Host "No versions with 'ExpirationDate' tag found for secret: $secretName"
+    Write-Host "No versions without 'ExpirationDate' tag found for secret: $secretName"
 }
