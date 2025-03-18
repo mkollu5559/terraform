@@ -1,6 +1,1 @@
-az keyvault secret show \
-  --vault-name "MyKeyVault" \
-  --name "MySecret" \
-  --version "SECRET_VERSION_GUID" \
-  --query "value" \
-  -o tsv
+$secretValue = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -Version $newestVersion.VersionId -AsPlainText
