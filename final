@@ -1,0 +1,63 @@
+$targetKeyVault = "MyKeyVault"  # Change this to your desired Key Vault name
+$allKeyVaults = Get-AzKeyVault | Where-Object { $_.VaultName -eq $targetKeyVault }
+
+foreach ($vault in $allKeyVaults) {
+    $vaultName = $vault.VaultName
+
+    # Get all secrets from this vault
+    $allSecrets = Get-AzKeyVaultSecret -VaultName $vaultName
+
+    foreach ($Secret in $allSecrets) {
+        $secretName = $Secret.Name
+
+        # Get all versions of this secret
+        $versions = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -IncludeVersions
+
+        # If no versions exist, skip to the next secret
+        if (-not $versions) {
+            Continue
+        }
+
+        # Get the latest version of the secret from Key Vault (current version)
+        $latestSecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+        $currentVersionId = ($latestSecret.Id -split "/")[-1]  # Extract the current/latest version ID
+
+        # Filter out any version that HAS an "ExpirationSetDate" tag
+        $filteredVersions = $versions | Where-Object {
+            $_.Tags -is $null -or -not ($_.Tags.ContainsKey("ExpirationSetDate"))
+        }
+
+        # Sort by creation time DESCENDING (newest first) and select the first one
+        $newestVersion = $filteredVersions | Sort-Object Created -Descending | Select-Object -First 1
+
+        # If we have no versions left after filtering, skip to the next secret
+        if (-not $newestVersion) {
+            Continue
+        }
+
+        # Extract the selected version ID
+        $selectedVersionId = ($newestVersion.Id -split "/")[-1]
+
+        # Check if the selected version is NOT the current version
+        if ($selectedVersionId -ne $currentVersionId) {
+            Write-Host "WARNING: This is NOT the current version for $vaultName -> $secretName"
+            Write-Host "    Selected Version: $selectedVersionId"
+            Write-Host "    Current Version:  $currentVersionId"
+
+            # Retrieve the secret value from the selected version
+            $secretValue = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -Version $selectedVersionId -AsPlainText
+
+            # Ensure the secret value is not null or empty before updating
+            if (-not $secretValue -or $secretValue -eq "") {
+                Write-Host "ERROR: Selected secret value is empty or null. Skipping update."
+            } else {
+                # Update the latest version with the selected version's secret value
+                Write-Host "Updating current version with the selected version's secret value..."
+                Set-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -SecretValue (ConvertTo-SecureString -String $secretValue -AsPlainText -Force)
+                Write-Host "Update completed for $secretName in $vaultName."
+            }
+
+            Write-Host ""
+        }
+    }
+}
