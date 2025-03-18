@@ -35,7 +35,6 @@ foreach ($vault in $allKeyVaults) {
         # 2) Filter out any version that HAS an ExpirationDate tag
         #    Keep versions that do not have that tag – even if they have no tags at all
         $filteredVersions = $versions | Where-Object {
-            # If $_.Tags is $null, or doesn't contain ExpirationDate, keep it
             -not (($_.Tags) -and ($_.Tags.ContainsKey("ExpirationDate")))
         }
 
@@ -49,6 +48,17 @@ foreach ($vault in $allKeyVaults) {
             Write-Host "    Newest version WITHOUT 'ExpirationDate' tag (including no-tag versions):"
             Write-Host "      VersionId: $($newestVersion.Id)"
             Write-Host "      Created:   $($newestVersion.Created)"
+
+            # Retrieve the secret’s plaintext value (most Az versions expose this in .Value)
+            $secretValue = $newestVersion.Value
+
+            # If .Value is not null/empty and doesn't start with '{', print it
+            if ($secretValue -and $secretValue -notlike '{*') {
+                Write-Host "      Secret Value (plaintext): $secretValue"
+            }
+            else {
+                Write-Host "      Secret Value not shown (either empty/null or begins with '{')."
+            }
         }
         else {
             Write-Host "    No matching versions found (all had an 'ExpirationDate' tag)."
