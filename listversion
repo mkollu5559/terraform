@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+# Replace this with your Azure subscription ID or name
+SUBSCRIPTION_ID="00000000-0000-0000-0000-000000000000"
+
+# 1) List all Key Vaults in your subscription
+vaultNames=$(az keyvault list \
+  --subscription "$SUBSCRIPTION_ID" \
+  --query "[].name" \
+  -o tsv)
+
+for vaultName in $vaultNames
+do
+    echo "======================================================================"
+    echo "Processing Key Vault: $vaultName"
+    echo "======================================================================"
+
+    # 2) List all secrets (by name) for the vault
+    secretNames=$(az keyvault secret list \
+      --vault-name "$vaultName" \
+      --query "[].name" \
+      -o tsv)
+
+    # 3) For each secret, list all versions and find the earliest one without `ExpirationDate` in its tags
+    for secretName in $secretNames
+    do
+        # Attempt to get the earliest version without `ExpirationDate`
+        earliestVersion=$(az keyvault secret list-versions \
+          --vault-name "$vaultName" \
+          --name "$secretName" \
+          --query "[?tags.ExpirationDate == null] | sort_by(@, &attributes.created)[0].{VersionId:id, Created:attributes.created}" \
+          -o json)
+
+        # If earliestVersion is null or empty, it means no version matched the filter
+        if [[ "$earliestVersion" == "null" || -z "$earliestVersion" ]]; then
+            echo "No versions without ExpirationDate tag found for secret: $secretName"
+        else
+            # Use 'jq' to parse JSON (assuming you have jq installed)
+            versionId=$(echo "$earliestVersion" | jq -r '.VersionId')
+            createdTime=$(echo "$earliestVersion" | jq -r '.Created')
+
+            echo "Earliest no-ExpirationDate version for secret '$secretName':"
+            echo "  VersionId: $versionId"
+            echo "  Created:   $createdTime"
+        fi
+    done
+
+    echo ""
+done
