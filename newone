@@ -13,6 +13,18 @@ $Tag2Value = (Get-Date).ToString("yyyy-MM-dd")
 # Option A: Programmatically retrieve all Key Vaults in your subscription:
 $vaults = Get-AzKeyVault
 
+# Ensure we can download modules from PSGallery
+Register-PSRepository -Name "PSGallery" -SourceLocation "https://www.powershellgallery.com/api/v2" -InstallationPolicy Trusted -ErrorAction SilentlyContinue
+
+# Install/Update the Az module, which includes Az.KeyVault
+Install-Module Az -Scope CurrentUser -Force
+
+# Optionally, explicitly import Az.KeyVault
+Import-Module Az.KeyVault
+
+# Now the Update-AzKeyVaultSecretAttribute cmdlet should be available
+Get-Command Update-AzKeyVaultSecretAttribute
+
 # Option B: Use an explicit list of vault names if you prefer:
 # $vaultNames = @("<KeyVaultName1>", "<KeyVaultName2>")
 # $vaults = $vaultNames | ForEach-Object { Get-AzKeyVault -VaultName $_ }
