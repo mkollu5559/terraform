@@ -1,11 +1,21 @@
-# Prerequisite: Have the Az PowerShell module installed 
+# Prerequisite: Have the Az PowerShell module installed
 # and be logged in via Connect-AzAccount.
 
-# Option A: Use a predefined list of vault names:
-# $vaultNames = @("<KeyVaultName1>", "<KeyVaultName2>")
+# --- Define your tags ---
+$Tag1Key   = "maneesha"
+$Tag1Value = "script"
 
-# Option B: Programmatically retrieve all Key Vaults in your subscription:
+$Tag2Key   = "ExpirationSetDate"
+# For example, store today's date as the tag value:
+$Tag2Value = (Get-Date).ToString("yyyy-MM-dd")
+
+# --- Retrieve Key Vaults ---
+# Option A: Programmatically retrieve all Key Vaults in your subscription:
 $vaults = Get-AzKeyVault
+
+# Option B: Use an explicit list of vault names if you prefer:
+# $vaultNames = @("<KeyVaultName1>", "<KeyVaultName2>")
+# $vaults = $vaultNames | ForEach-Object { Get-AzKeyVault -VaultName $_ }
 
 foreach ($vault in $vaults) {
     $vaultName = $vault.VaultName
@@ -13,31 +23,30 @@ foreach ($vault in $vaults) {
 
     # Retrieve the latest version of all secrets in this Key Vault
     $secrets = Get-AzKeyVaultSecret -VaultName $vaultName
-    
+
     foreach ($secret in $secrets) {
-        # Check whether this secret has an expiration date
-        if (-not $secret.Attributes.Expires) {
-            Write-Host "Updating expiration for secret:" $secret.Name `
-                       "Version:" $secret.Version `
-                       "in vault:" $vaultName
+        Write-Host "Adding/updating tags for secret:" $secret.Name "Version:" $secret.Version
 
-            # Example: Set the expiration 12 months (1 year) from now
-            $newExpiry = (Get-Date).AddMonths(12)
-
-            # Update the existing secret's expiration date in place
-            Update-AzKeyVaultSecretAttribute `
-                -VaultName $vaultName `
-                -Name $secret.Name `
-                -Version $secret.Version `
-                -Expires $newExpiry
-
-            Write-Host "Set expiration to $newExpiry for secret:" $secret.Name
+        # Retrieve any existing tags so we can add or update
+        $tagHashtable = $secret.Tags
+        if ($tagHashtable -eq $null) {
+            $tagHashtable = @{}
         }
-        else {
-            Write-Host "Secret" $secret.Name "already has an expiration date. No update performed."
-        }
+
+        # Add or update the specific tags you want
+        $tagHashtable[$Tag1Key] = $Tag1Value
+        $tagHashtable[$Tag2Key] = $Tag2Value
+
+        # Update the secret's existing version with the new tags
+        Update-AzKeyVaultSecretAttribute `
+            -VaultName $vaultName `
+            -Name $secret.Name `
+            -Version $secret.Version `
+            -Tags $tagHashtable
+
+        Write-Host "Tags updated for secret:" $secret.Name
     }
 
-    Write-Host "Completed processing Key Vault:" $vaultName
+    Write-Host "Completed processing Key Vault: $vaultName"
     Write-Host "-------------------------------------------"
 }
